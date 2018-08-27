@@ -8,12 +8,14 @@
 
 import Foundation
 import RealmSwift
-import SwipeCellKit
+import ChameleonFramework
 
-class ItemViewController: UITableViewController {
+
+class ItemViewController: SwipeTableViewController {
     
     let realm = try! Realm()
     var todoItems: Results<Item>?
+    @IBOutlet weak var searchBar: UISearchBar!
     
     var selectedCategory: Category? {
         didSet{
@@ -26,6 +28,41 @@ class ItemViewController: UITableViewController {
         // Do any additional setup after loading the view, typically from a nib.
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        
+        guard let colorHex = selectedCategory?.cellColor else{fatalError("Navigation controller error")}
+        
+        updateNavBarColor(colorHexCode: colorHex)
+        
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        
+        updateNavBarColor(colorHexCode: "FF7E79")
+        
+    }
+    
+    func updateNavBarColor (colorHexCode: String){
+        
+        title = selectedCategory?.name
+        
+        guard let navBarColor = UIColor(hexString: colorHexCode) else {fatalError("Navigation controller error")}
+        
+        guard let navBar = navigationController?.navigationBar else {fatalError("Navigation controller error")}
+        
+        //Navigation bar background color
+        navBar.barTintColor = navBarColor
+        
+        //SearchBar color
+        searchBar.barTintColor = navBarColor
+        
+        //Title color
+        navBar.titleTextAttributes = [NSAttributedStringKey.foregroundColor: ContrastColorOf(navBarColor, returnFlat: true)]
+        
+        //Tint color
+        navBar.tintColor = ContrastColorOf(navBarColor, returnFlat: true)
+        
+    }
     
     //MARK:- TableView Datasource
     
@@ -34,18 +71,29 @@ class ItemViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ItemCell", for: indexPath)
+        
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
         if let items = todoItems?[indexPath.row]{
             
             cell.textLabel?.text = items.title
             
+            
+            if let color = UIColor(hexString: selectedCategory!.cellColor)?.darken(byPercentage:CGFloat(indexPath.row)/CGFloat(todoItems!.count)){
+                    cell.backgroundColor = color
+                    cell.textLabel?.textColor = ContrastColorOf(color, returnFlat: true)
+                }
+            
             cell.accessoryType = items.done ? .checkmark : .none
-        } else{
+        }
+        else{
+            
             cell.textLabel?.text = "No Items Added"
+            
         }
         
         return cell
+        
     }
     
     //MARK:- TableView Delegate
@@ -84,6 +132,7 @@ class ItemViewController: UITableViewController {
                         newItem.title = textField.text!
                         newItem.dateCreated = Date()
                         currentCategory.items.append(newItem)
+                        
                     }
                 } catch{
                     print("Error saving new items, \(error)")
@@ -116,6 +165,20 @@ class ItemViewController: UITableViewController {
         tableView.reloadData()
     }
     
+    //MARK: - Delete Data Method
+    override func updateDataModel(at indexPath: IndexPath) {
+        
+        if let itemsToBeDeleted = self.todoItems?[indexPath.row]{
+            do{
+                try realm.write {
+                    realm.delete(itemsToBeDeleted)
+                }
+            } catch{
+                print("Error when deleting item, \(error)")
+            }
+        }
+        
+    }
     
     func loadItems(){
         
@@ -126,6 +189,8 @@ class ItemViewController: UITableViewController {
     }
     
 }
+
+
 
 //MARK:- SearchBar Methods
 
@@ -149,3 +214,4 @@ extension ItemViewController: UISearchBarDelegate {
     }
     
 }
+
